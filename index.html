@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Улучшенный генератор мемов</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');
+		@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@700&display=swap');
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #f0f0f0;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .container {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            padding: 20px;
+            max-width: 600px;
+            width: 100%;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        #meme-container {
+            position: relative;
+            display: inline-block;
+            margin-bottom: 20px;
+            max-width: 100%;
+        }
+        #meme-canvas {
+            max-width: 100%;
+            height: auto;
+        }
+        textarea {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+            resize: vertical;
+        }
+        input[type="range"], button, .file-label {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button, .file-label {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            text-align: center;
+        }
+        button:hover, .file-label:hover {
+            background-color: #45a049;
+        }
+        #file-input {
+            display: none;
+        }
+        .button-container {
+            display: flex;
+            justify-content: space-between;
+        }
+        .button-container button {
+            width: 48%;
+        }
+        #copy-button {
+            background-color: #008CBA;
+        }
+        #copy-button:hover {
+            background-color: #007B9A;
+        }
+        .instructions {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 15px;
+        }
+        #language-toggle {
+            background-color: #3F51B5;
+            margin-bottom: 15px;
+        }
+        #language-toggle:hover {
+            background-color: #303F9F;
+        }
+        .slider-container {
+            margin-bottom: 10px;
+        }
+        .slider-container label {
+            display: inline-block;
+            width: 100%;
+            margin-bottom: 5px;
+        }
+        .credits {
+            font-size: 0.8em;
+            color: #666;
+            text-align: center;
+            margin-top: 20px;
+        }
+        .credits a {
+            color: #3F51B5;
+            text-decoration: none;
+        }
+        .credits a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <button id="language-toggle">Switch to English</button>
+        <h1 id="title">Улучшенный генератор мемов</h1>
+        <p class="instructions" id="instructions">Выберите изображение с компьютера или вставьте его, используя Ctrl+V</p>
+        <textarea id="top-input" rows="2" placeholder="Верхний текст"></textarea>
+        <div class="slider-container">
+            <label for="top-text-size" id="top-size-label">Размер верхнего текста: 1</label>
+            <input type="range" id="top-text-size" min="0.5" max="5" step="0.1" value="1">
+        </div>
+        <textarea id="bottom-input" rows="2" placeholder="Нижний текст"></textarea>
+        <div class="slider-container">
+            <label for="bottom-text-size" id="bottom-size-label">Размер нижнего текста: 1</label>
+            <input type="range" id="bottom-text-size" min="0.5" max="5" step="0.1" value="1">
+        </div>
+        <div class="slider-container">
+            <label for="text-stretch" id="stretch-label">Растяжение текста: 1</label>
+            <input type="range" id="text-stretch" min="1" max="3" step="0.1" value="1">
+        </div>
+        <label for="file-input" class="file-label" id="file-label">Выбрать изображение</label>
+        <input type="file" id="file-input" accept="image/*">
+        <div id="meme-container">
+            <canvas id="meme-canvas"></canvas>
+        </div>
+        <div class="button-container">
+            <button id="download-button">Скачать мем</button>
+            <button id="copy-button">Копировать мем</button>
+        </div>
+        <p class="credits">Сделали <a href="https://www.anthropic.com" target="_blank">Claude</a> и <a href="https://t.me/deniskatech" target="_blank">Дениска</a></p>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('meme-canvas');
+        const ctx = canvas.getContext('2d');
+        let memeImage = new Image();
+        let currentLanguage = 'ru';
+
+        function drawMemeText(text, y, fontSize, stretch) {
+            ctx.font = `700 ${fontSize}px 'Oswald', sans-serif`;
+            ctx.fillStyle = 'white';
+            ctx.strokeStyle = 'black';
+            ctx.lineWidth = fontSize / 15;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            const lines = text.split('\n');
+            const lineHeight = fontSize * 1.2;
+            let totalHeight = lineHeight * lines.length;
+            let startY = y - (totalHeight / 2);
+
+            ctx.save();
+            ctx.scale(1, stretch);
+
+            lines.forEach((line, index) => {
+                let scaleFactor = 1;
+                let textWidth = ctx.measureText(line).width;
+
+                while (textWidth > canvas.width * 0.9 && fontSize * scaleFactor > 10) {
+                    scaleFactor -= 0.05;
+                    ctx.font = `700 ${fontSize * scaleFactor}px 'Oswald', sans-serif`;
+                    textWidth = ctx.measureText(line).width;
+                }
+
+                const lineY = (startY + (index * lineHeight)) / stretch;
+                ctx.strokeText(line, canvas.width / 2, lineY);
+                ctx.fillText(line, canvas.width / 2, lineY);
+            });
+
+            ctx.restore();
+        }
+
+        function redrawMeme() {
+            const topText = document.getElementById('top-input').value;
+            const bottomText = document.getElementById('bottom-input').value;
+            const textStretch = parseFloat(document.getElementById('text-stretch').value);
+            const topTextSize = parseFloat(document.getElementById('top-text-size').value);
+            const bottomTextSize = parseFloat(document.getElementById('bottom-text-size').value);
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(memeImage, 0, 0, canvas.width, canvas.height);
+
+            const baseFontSize = Math.min(canvas.width / 10, 60);
+            drawMemeText(topText, canvas.height * 0.15, baseFontSize * topTextSize, textStretch);
+            drawMemeText(bottomText, canvas.height * 0.975, baseFontSize * bottomTextSize, textStretch);
+        }
+
+        function handleImageUpload(file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                memeImage.onload = function() {
+                    canvas.width = memeImage.width;
+                    canvas.height = memeImage.height;
+                    redrawMeme();
+                }
+                memeImage.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        document.addEventListener('paste', function(event) {
+            const items = event.clipboardData.items;
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf('image') !== -1) {
+                    handleImageUpload(items[i].getAsFile());
+                    break;
+                }
+            }
+        });
+
+        document.getElementById('file-input').addEventListener('change', function(event) {
+            handleImageUpload(event.target.files[0]);
+        });
+
+        document.getElementById('top-input').addEventListener('input', redrawMeme);
+        document.getElementById('bottom-input').addEventListener('input', redrawMeme);
+        document.getElementById('text-stretch').addEventListener('input', function() {
+            document.getElementById('stretch-label').textContent = `${currentLanguage === 'ru' ? 'Растяжение текста' : 'Text stretch'}: ${this.value}`;
+            redrawMeme();
+        });
+        document.getElementById('top-text-size').addEventListener('input', function() {
+            document.getElementById('top-size-label').textContent = `${currentLanguage === 'ru' ? 'Размер верхнего текста' : 'Top text size'}: ${this.value}`;
+            redrawMeme();
+        });
+        document.getElementById('bottom-text-size').addEventListener('input', function() {
+            document.getElementById('bottom-size-label').textContent = `${currentLanguage === 'ru' ? 'Размер нижнего текста' : 'Bottom text size'}: ${this.value}`;
+            redrawMeme();
+        });
+
+        document.getElementById('download-button').addEventListener('click', function() {
+            const link = document.createElement('a');
+            link.download = 'meme.png';
+            link.href = canvas.toDataURL();
+            link.click();
+        });
+
+        document.getElementById('copy-button').addEventListener('click', function() {
+            canvas.toBlob(function(blob) {
+                const item = new ClipboardItem({ "image/png": blob });
+                navigator.clipboard.write([item]).then(function() {
+                    alert(currentLanguage === 'ru' ? 'Мем скопирован в буфер обмена!' : 'Meme copied to clipboard!');
+                }, function(error) {
+                    console.error('Ошибка копирования: ', error);
+                });
+            });
+        });
+
+        document.getElementById('language-toggle').addEventListener('click', function() {
+            currentLanguage = currentLanguage === 'ru' ? 'en' : 'ru';
+            updateLanguage();
+        });
+
+        function updateLanguage() {
+            const translations = {
+                ru: {
+                    title: "Улучшенный генератор мемов",
+                    instructions: "Выберите изображение с компьютера или вставьте его, используя Ctrl+V",
+                    topInput: "Верхний текст",
+                    bottomInput: "Нижний текст",
+                    stretchLabel: "Растяжение текста",
+                    topSizeLabel: "Размер верхнего текста",
+                    bottomSizeLabel: "Размер нижнего текста",
+                    fileLabel: "Выбрать изображение",
+                    downloadButton: "Скачать мем",
+                    copyButton: "Копировать мем",
+                    languageToggle: "Switch to English",
+                    credits: 'Сделали <a href="https://www.anthropic.com" target="_blank">Claude</a> и <a href="https://t.me/deniskatech" target="_blank">Дениска</a>'
+                },
+                en: {
+                    title: "Improved Meme Generator",
+                    instructions: "Choose an image from your computer or paste it using Ctrl+V",
+                    topInput: "Top text",
+                    bottomInput: "Bottom text",
+                    stretchLabel: "Text stretch",
+                    topSizeLabel: "Top text size",
+                    bottomSizeLabel: "Bottom text size",
+                    fileLabel: "Choose image",
+                    downloadButton: "Download meme",
+                    copyButton: "Copy meme",
+                    languageToggle: "Переключить на русский",
+                    credits: 'Made by <a href="https://www.anthropic.com" target="_blank">Claude</a> and <a href="https://t.me/deniskatech" target="_blank">Deniska</a>'
+                }
+            };
+
+            const t = translations[currentLanguage];
+
+            document.getElementById('title').textContent = t.title;
+            document.getElementById('instructions').textContent = t.instructions;
+            document.getElementById('top-input').placeholder = t.topInput;
+            document.getElementById('bottom-input').placeholder = t.bottomInput;
+            document.getElementById('stretch-label').textContent = `${t.stretchLabel}: ${document.getElementById('text-stretch').value}`;
+            document.getElementById('top-size-label').textContent = `${t.topSizeLabel}: ${document.getElementById('top-text-size').value}`;
+            document.getElementById('bottom-size-label').textContent = `${t.bottomSizeLabel}: ${document.getElementById('bottom-text-size').value}`;
+            document.getElementById('file-label').textContent = t.fileLabel;
+            document.getElementById('download-button').textContent = t.downloadButton;
+            document.getElementById('copy-button').textContent = t.copyButton;
+            document.getElementById('language-toggle').textContent = t.languageToggle;
+            document.querySelector('.credits').innerHTML = t.credits;
+        }
+
+        // // Preload the Anton font
+        // const font = new FontFace('Anton', 'url(https://fonts.gstatic.com/s/anton/v23/1Ptgg87LROyAm3Kz-C8.woff2)', { style: 'normal', weight: '400' });
+        // font.load().then(function(loadedFont) {
+        //     document.fonts.add(loadedFont);
+        //     redrawMeme();
+        // }).catch(function(error) {
+        //     console.error('Error loading font:', error);
+        // });
+	
+
+
+        // // Ensure the font is loaded before drawing
+        // document.fonts.ready.then(function() {
+        //     redrawMeme();
+        // });
+    </script>
+</body>
+</html>
+</antA
